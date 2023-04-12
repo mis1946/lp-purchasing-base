@@ -332,7 +332,23 @@ public class POReceiving implements GTransaction{
             if (!poGRider.getErrMsg().isEmpty()){
                 setErrMsg(poGRider.getErrMsg());
             } else setErrMsg("No record deleted.");  
-        } else lbResult = true;
+        } else{
+            lsSQL = "UPDATE PO_Master " + 
+                        " SET  cTranStat = '4'"  + 
+                            ", sPostedxx = " + SQLUtil.toSQL(psUserIDxx) +
+                            ", dPostedxx = " + SQLUtil.toSQL(poGRider.getServerDate()) + 
+                            ", sModified = " + SQLUtil.toSQL(psUserIDxx) +
+                            ", dModified = " + SQLUtil.toSQL(poGRider.getServerDate()) + 
+                        " WHERE sTransNox = " + SQLUtil.toSQL(loObject.getSourceNo());
+            System.out.println(lsSQL);
+            if (poGRider.executeQuery(lsSQL, "PO_Master", "", "") == 0){
+                if (!poGRider.getErrMsg().isEmpty()){
+                    setErrMsg(poGRider.getErrMsg());
+                } else setErrMsg("No order updated.");  
+            }else{
+                lbResult = true;
+            }
+        }
         
         if (!pbWithParent){
             if (getErrMsg().isEmpty()){
@@ -359,6 +375,7 @@ public class POReceiving implements GTransaction{
         
         String lsSQL = "UPDATE " + loObject.getTable() + 
                         " SET  cTranStat = " + SQLUtil.toSQL(TransactionStatus.STATE_VOID) + 
+                            ", sModified = " + SQLUtil.toSQL(psUserIDxx) +
                             ", dModified = " + SQLUtil.toSQL(poGRider.getServerDate()) + 
                         " WHERE sTransNox = " + SQLUtil.toSQL(loObject.getTransNox());
         

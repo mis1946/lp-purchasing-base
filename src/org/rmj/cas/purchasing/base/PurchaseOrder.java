@@ -52,6 +52,7 @@ public class PurchaseOrder implements GTransaction{
                 //load each column to the entity
                 for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
                     loObject.setValue(lnCol, loRS.getObject(lnCol));
+                    
                 }
                 
                 //load detail
@@ -638,7 +639,7 @@ public class PurchaseOrder implements GTransaction{
             if (!poDetail.get(lnCtr).getStockID().equals("")){
                 if (fbNewRecord){
                     //Generate the SQL Statement
-                    lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr));
+                    lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),"nQtyOnHnd");
                 }else{
                     //Load previous transaction
                     loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
@@ -646,10 +647,12 @@ public class PurchaseOrder implements GTransaction{
                     //Generate the Update Statement
                     lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
                                                 "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
-                                                    " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox());
+                                                    " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox(),
+                                                "nQtyOnHnd");
                 }
 
                 if (!lsSQL.equals("")){
+//                        lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Incentive_Master", "xBranchNm;xDeptName");
                     if(poGRider.executeQuery(lsSQL, pxeDetTable, "", "") == 0){
                         if(!poGRider.getErrMsg().isEmpty()){ 
                             setErrMsg(poGRider.getErrMsg());
@@ -697,7 +700,7 @@ public class PurchaseOrder implements GTransaction{
             for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
                 loObj.setValue(lnCol, loRS.getObject(lnCol));
             }
-        }      
+        }  
         return loObj;
     }
     

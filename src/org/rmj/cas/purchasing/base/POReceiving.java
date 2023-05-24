@@ -690,65 +690,67 @@ public class POReceiving implements GTransaction{
         int lnCtr;
         int lnRow = 0;
         
-        for (lnCtr = 0; lnCtr <= ItemCount() -1; lnCtr++){      
-            if (System.getProperty("store.inventory.strict.type").equals("0")){
-                if (poDetail.get(lnCtr).getStockID().equals("") &&
-                    !paDetailOthers.get(lnCtr).getValue(101).equals("")){
-
-                    //create inventory.
-                    Inventory loInv = new Inventory(poGRider, psBranchCd, true);
-                    loInv.NewRecord();
-
-                    if (paDetailOthers.get(lnCtr).getValue(100).equals(""))
-                        loInv.setMaster("sBarCodex", CommonUtils.getNextReference(poGRider.getConnection(), "Inventory", "sBarCodex", true));
-                    else
-                        loInv.setMaster("sBarCodex", paDetailOthers.get(lnCtr).getValue(100));
-
-                    loInv.setMaster("sDescript", paDetailOthers.get(lnCtr).getValue(101));
-                    loInv.setMaster("sInvTypCd", foData.getInvTypeCd());
-                    loInv.setMaster("nUnitPrce", poDetail.get(lnCtr).getUnitPrice());
-                    loInv.setMaster("nSelPrice", poDetail.get(lnCtr).getUnitPrice());
-                    loInv.setMaster("nPurPrice", poDetail.get(lnCtr).getUnitPrice());
-                    if (!loInv.SaveRecord()){
-                        setMessage(loInv.getErrMsg() + "; " + loInv.getMessage());
-                        return false;
-                    }
-
-                    poDetail.get(lnCtr).setStockID((String) loInv.getMaster("sStockIDx"));
-                }
-            }
-
-            poDetail.get(lnCtr).setTransNox(foData.getTransNox());
-            poDetail.get(lnCtr).setEntryNox(lnCtr + 1);
-            poDetail.get(lnCtr).setDateModified(poGRider.getServerDate());
-            
+        for (lnCtr = 0; lnCtr <= ItemCount() - 1; lnCtr++){      
+//mac 2023.05.20
+//   do not allow to encode non existing item on the inventory.
+//            if (System.getProperty("store.inventory.strict.type").equals("0")){
+//                if (poDetail.get(lnCtr).getStockID().equals("") &&
+//                    !paDetailOthers.get(lnCtr).getValue(101).equals("")){
+//
+//                    //create inventory.
+//                    Inventory loInv = new Inventory(poGRider, psBranchCd, true);
+//                    loInv.NewRecord();
+//
+//                    if (paDetailOthers.get(lnCtr).getValue(100).equals(""))
+//                        loInv.setMaster("sBarCodex", CommonUtils.getNextReference(poGRider.getConnection(), "Inventory", "sBarCodex", true));
+//                    else
+//                        loInv.setMaster("sBarCodex", paDetailOthers.get(lnCtr).getValue(100));
+//
+//                    loInv.setMaster("sDescript", paDetailOthers.get(lnCtr).getValue(101));
+//                    loInv.setMaster("sInvTypCd", foData.getInvTypeCd());
+//                    loInv.setMaster("nUnitPrce", poDetail.get(lnCtr).getUnitPrice());
+//                    loInv.setMaster("nSelPrice", poDetail.get(lnCtr).getUnitPrice());
+//                    loInv.setMaster("nPurPrice", poDetail.get(lnCtr).getUnitPrice());
+//                    if (!loInv.SaveRecord()){
+//                        setMessage(loInv.getErrMsg() + "; " + loInv.getMessage());
+//                        return false;
+//                    }
+//
+//                    poDetail.get(lnCtr).setStockID((String) loInv.getMaster("sStockIDx"));
+//                }
+//            }
             if (!poDetail.get(lnCtr).getStockID().equals("")){
-                if (fbNewRecord){
-                    //Generate the SQL Statement
-                    lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr));
-                }else{
-                    //Load previous transaction
-                    loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
+                poDetail.get(lnCtr).setTransNox(foData.getTransNox());
+                poDetail.get(lnCtr).setEntryNox(lnCtr + 1);
+                poDetail.get(lnCtr).setDateModified(poGRider.getServerDate());
 
-                    //Generate the Update Statement
-                    lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
-                                                "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
-                                                    " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox());
-                }
+                if (!poDetail.get(lnCtr).getStockID().equals("")){
+                    if (fbNewRecord){
+                        //Generate the SQL Statement
+                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr));
+                    }else{
+                        //Load previous transaction
+                        loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
 
-                if (!lsSQL.equals("")){
-                    if(poGRider.executeQuery(lsSQL, pxeDetTable, "", "") == 0){
-                        if(!poGRider.getErrMsg().isEmpty()){ 
-                            setErrMsg(poGRider.getErrMsg());
-                            return false;
+                        //Generate the Update Statement
+                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
+                                                    "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
+                                                        " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox());
+                    }
+
+                    if (!lsSQL.equals("")){
+                        if(poGRider.executeQuery(lsSQL, pxeDetTable, "", "") == 0){
+                            if(!poGRider.getErrMsg().isEmpty()){ 
+                                setErrMsg(poGRider.getErrMsg());
+                                return false;
+                            }
+
+                        }else {
+                            lnRow += 1;
                         }
-                        
-                    }else {
-                        lnRow += 1;
                     }
                 }
             }
-                
         }    
         
         if (lnRow == 0) {

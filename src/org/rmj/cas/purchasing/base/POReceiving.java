@@ -15,13 +15,11 @@ import org.rmj.appdriver.iface.GEntity;
 import org.rmj.appdriver.iface.GTransaction;
 import org.rmj.appdriver.MiscUtil;
 import org.rmj.appdriver.SQLUtil;
-import org.rmj.appdriver.agentfx.CommonUtils;
 import org.rmj.appdriver.agentfx.ShowMessageFX;
 import org.rmj.appdriver.agentfx.ui.showFXDialog;
 import org.rmj.appdriver.constants.TransactionStatus;
 import org.rmj.appdriver.constants.UserRight;
 import org.rmj.cas.inventory.base.InventoryTrans;
-import org.rmj.cas.inventory.base.Inventory;
 import org.rmj.cas.inventory.base.InvExpiration;
 import org.rmj.cas.purchasing.pojo.UnitPOReceivingDetail;
 import org.rmj.cas.purchasing.pojo.UnitPOReceivingDetailOthers;
@@ -109,11 +107,6 @@ public class POReceiving implements GTransaction{
             return loResult;
         }
         
-//        if (loNewEnt.getInvTypeCd()== null || loNewEnt.getInvTypeCd().isEmpty()){
-//            setMessage("Invalid inventory type detected.");
-//            return loResult;
-//        }
-        
         if (loNewEnt.getSupplier() == null || loNewEnt.getSupplier().isEmpty()){
             setMessage("Invalid supplier detected.");
             return loResult;
@@ -121,10 +114,7 @@ public class POReceiving implements GTransaction{
                
         if (!pbWithParent) poGRider.beginTrans();
         
-        //delete empty detail
-        if (System.getProperty("store.inventory.strict.type").equals("1")){
-            if (poDetail.get(ItemCount()-1).getStockID().equals("")) deleteDetail(ItemCount() -1);
-        }
+        if (poDetail.get(ItemCount()-1).getStockID().equals("")) deleteDetail(ItemCount() -1);
         
         if (ItemCount() <= 0){
             setMessage("Unable to save no item record.");
@@ -257,6 +247,12 @@ public class POReceiving implements GTransaction{
             setMessage("Invalid/No approval code detected.");
             return lbResult;
         }
+        
+        if (poGRider.getUserLevel() < UserRight.SUPERVISOR){
+            setMessage("User is not allowed confirming transaction.");
+            return lbResult;
+        }
+        
         
         if (!loObject.getTranStat().equalsIgnoreCase(TransactionStatus.STATE_OPEN)){
             setMessage("Unable to close closed/cancelled/posted/voided transaction.");
@@ -500,59 +496,7 @@ public class POReceiving implements GTransaction{
                     ", dModified" +
                 " FROM " + pxeMasTable;
     }
-    
-    //Added detail methods    
-    /*private boolean saveInvTrans(){
-        InventoryTrans loInvTrans = new InventoryTrans(poGRider, poGRider.getBranchCode());
-        loInvTrans.InitTransaction();
-        
-        for (int lnCtr = 0; lnCtr <= paDetail.size() - 1; lnCtr ++){
-            if (paDetail.get(lnCtr).getStockIDx().equals("")) break;
-            loInvTrans.setDetail(lnCtr, "sStockIDx", paDetail.get(lnCtr).getStockIDx());
-            loInvTrans.setDetail(lnCtr, "sReplacID", paDetail.get(lnCtr).getOrigIDxx());
-            loInvTrans.setDetail(lnCtr, "nQuantity", paDetail.get(lnCtr).getQuantity());
-            loInvTrans.setDetail(lnCtr, "nQtyOnHnd", paDetailOthers.get(lnCtr).getValue("nQtyOnHnd"));
-            loInvTrans.setDetail(lnCtr, "nResvOrdr", paDetailOthers.get(lnCtr).getValue("nResvOrdr"));
-            loInvTrans.setDetail(lnCtr, "nBackOrdr", paDetailOthers.get(lnCtr).getValue("nBackOrdr"));
-            loInvTrans.setDetail(lnCtr, "nLedgerNo", paDetailOthers.get(lnCtr).getValue("nLedgerNo"));
-        }
-        
-        if (!loInvTrans.Delivery(poData.getTransNox(), poGRider.getServerDate(), EditMode.ADDNEW)){
-            setMessage(loInvTrans.getMessage());
-            setErrMsg(loInvTrans.getErrMsg());
-            return false;
-        }
-        
-        //TODO
-            //update branch order info
-    
-        return true;
-    }
-    
-    private boolean unsaveInvTrans(){
-        InventoryTrans loInvTrans = new InventoryTrans(poGRider, poGRider.getBranchCode());
-        loInvTrans.InitTransaction();
-        
-        for (int lnCtr = 0; lnCtr <= paDetail.size() - 1; lnCtr ++){
-            loInvTrans.setDetail(lnCtr, "sStockIDx", paDetail.get(lnCtr).getStockIDx());
-            loInvTrans.setDetail(lnCtr, "nQtyOnHnd", paDetailOthers.get(lnCtr).getValue("nQtyOnHnd"));
-            loInvTrans.setDetail(lnCtr, "nResvOrdr", paDetailOthers.get(lnCtr).getValue("nResvOrdr"));
-            loInvTrans.setDetail(lnCtr, "nBackOrdr", paDetailOthers.get(lnCtr).getValue("nBackOrdr"));
-            loInvTrans.setDetail(lnCtr, "nLedgerNo", paDetailOthers.get(lnCtr).getValue("nLedgerNo"));
-        }
-        
-        if (!loInvTrans.Delivery(poData.getTransNox(), poGRider.getServerDate(), EditMode.DELETE)){
-            setMessage(loInvTrans.getMessage());
-            setErrMsg(loInvTrans.getErrMsg());
-            return false;
-        }
-        
-        //TODO
-            //update branch order info
-    
-        return true;
-    }*/
-    
+   
     public int ItemCount(){
         return poDetail.size();
     }
@@ -564,14 +508,13 @@ public class POReceiving implements GTransaction{
         }else{
             if (System.getProperty("store.inventory.strict.type").equals("1")){
                 if (!poDetail.get(ItemCount()-1).getStockID().equals("") &&
-                        poDetail.get(ItemCount() -1).getQuantity().doubleValue()!= 0.00){
+                    poDetail.get(ItemCount() -1).getQuantity().doubleValue()!= 0.00){
                     poDetail.add(new UnitPOReceivingDetail());
                     paDetailOthers.add(new UnitPOReceivingDetailOthers());
                 } else return false;
             } else {
-                if ((!poDetail.get(ItemCount()-1).getStockID().equals("") ||
-                    !paDetailOthers.get(ItemCount()-1).getValue(101).equals("")) &&
-                        poDetail.get(ItemCount() -1).getQuantity().doubleValue()!= 0.00){
+                if (!poDetail.get(ItemCount()-1).getStockID().equals("") &&
+                    poDetail.get(ItemCount() -1).getQuantity().doubleValue() != 0.00){
                     poDetail.add(new UnitPOReceivingDetail());
                     paDetailOthers.add(new UnitPOReceivingDetailOthers());
                 } else return false;
@@ -677,11 +620,6 @@ public class POReceiving implements GTransaction{
     }
     
     private boolean saveDetail(UnitPOReceivingMaster foData, boolean fbNewRecord) throws SQLException{
-        if (ItemCount() <= 0){
-            setMessage("No transaction detail detected.");
-            return false;
-        }
-        
         UnitPOReceivingDetail loDetail;
         UnitPOReceivingDetail loOldDet;
         
@@ -691,35 +629,12 @@ public class POReceiving implements GTransaction{
         int lnRow = 0;
         
         for (lnCtr = 0; lnCtr <= ItemCount() - 1; lnCtr++){      
-//mac 2023.05.20
-//   do not allow to encode non existing item on the inventory.
-//            if (System.getProperty("store.inventory.strict.type").equals("0")){
-//                if (poDetail.get(lnCtr).getStockID().equals("") &&
-//                    !paDetailOthers.get(lnCtr).getValue(101).equals("")){
-//
-//                    //create inventory.
-//                    Inventory loInv = new Inventory(poGRider, psBranchCd, true);
-//                    loInv.NewRecord();
-//
-//                    if (paDetailOthers.get(lnCtr).getValue(100).equals(""))
-//                        loInv.setMaster("sBarCodex", CommonUtils.getNextReference(poGRider.getConnection(), "Inventory", "sBarCodex", true));
-//                    else
-//                        loInv.setMaster("sBarCodex", paDetailOthers.get(lnCtr).getValue(100));
-//
-//                    loInv.setMaster("sDescript", paDetailOthers.get(lnCtr).getValue(101));
-//                    loInv.setMaster("sInvTypCd", foData.getInvTypeCd());
-//                    loInv.setMaster("nUnitPrce", poDetail.get(lnCtr).getUnitPrice());
-//                    loInv.setMaster("nSelPrice", poDetail.get(lnCtr).getUnitPrice());
-//                    loInv.setMaster("nPurPrice", poDetail.get(lnCtr).getUnitPrice());
-//                    if (!loInv.SaveRecord()){
-//                        setMessage(loInv.getErrMsg() + "; " + loInv.getMessage());
-//                        return false;
-//                    }
-//
-//                    poDetail.get(lnCtr).setStockID((String) loInv.getMaster("sStockIDx"));
-//                }
-//            }
             if (!poDetail.get(lnCtr).getStockID().equals("")){
+                if (Double.parseDouble(poDetail.get(lnCtr).getQuantity().toString()) <= 0.00){
+                    setMessage("Unable to save zero quantity detail.");
+                    return false;
+                }
+                
                 poDetail.get(lnCtr).setTransNox(foData.getTransNox());
                 poDetail.get(lnCtr).setEntryNox(lnCtr + 1);
                 poDetail.get(lnCtr).setDateModified(poGRider.getServerDate());
@@ -878,9 +793,12 @@ public class POReceiving implements GTransaction{
     
     //Added methods
     private boolean saveInvTrans(String fsTransNox, String fsSupplier, Date fdTransact){
+        String lsOrderNo = "";
+        String lsSQL = "";
+        
         InventoryTrans loInvTrans = new InventoryTrans(poGRider, poGRider.getBranchCode());
         loInvTrans.InitTransaction();
-        String lsOrderNo="";
+        
         
         for (int lnCtr = 0; lnCtr <= poDetail.size() - 1; lnCtr ++){
             if (poDetail.get(lnCtr).getStockID().equals("")) break;
@@ -894,27 +812,19 @@ public class POReceiving implements GTransaction{
             loInvTrans.setDetail(lnCtr, "nLedgerNo", paDetailOthers.get(lnCtr).getValue("nLedgerNo"));
             loInvTrans.setDetail(lnCtr, "dExpiryDt", poDetail.get(lnCtr).getDateExpiry());
             
-            if (!poDetail.get(lnCtr).getOrderNox().equals("")) {
-                if (!lsOrderNo.equals("")) {
-                    lsOrderNo=poDetail.get(lnCtr).getOrderNox();
+            lsOrderNo = poDetail.get(lnCtr).getOrderNox();
+            
+            if (!lsOrderNo.equals("")) {
+                lsSQL = "UPDATE PO_Detail SET" +
+                            "  nReceived = nReceived + " + poDetail.get(lnCtr).getQuantity() +
+                        " WHERE sTransNox = " + SQLUtil.toSQL(lsOrderNo) +
+                            " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox();
+                
+                if (poGRider.executeQuery(lsSQL, "PO_Detail", psBranchCd, "") <= 0){
+                    setMessage("Unable to update order reference.");
+                    return false;
                 }
             }  
-        }
-        
-        if (!lsOrderNo.equals("")) {    
-            String lsSQL = "UPDATE PO_Master SET" + 
-                        "  cTranStat = " + SQLUtil.toSQL(TransactionStatus.STATE_POSTED) + 
-                        ", sPostedxx = " + SQLUtil.toSQL(psUserIDxx) +
-                        ", dPostedxx = " + SQLUtil.toSQL(poGRider.getServerDate()) + 
-                        ", sModified = " + SQLUtil.toSQL(psUserIDxx) +
-                        ", dModified = " + SQLUtil.toSQL(poGRider.getServerDate()) + 
-                    " WHERE sTransNox = " + SQLUtil.toSQL(lsOrderNo);
-
-            if (poGRider.executeQuery(lsSQL, "PO_Master", "", "") == 0){
-                if (!poGRider.getErrMsg().isEmpty()){
-                    setErrMsg(poGRider.getErrMsg());
-                } else setErrMsg("No record to update for PO_Master.");  
-            }
         }
         
         if (!loInvTrans.POReceiving(fsTransNox, fdTransact, fsSupplier, EditMode.ADDNEW)){
@@ -922,14 +832,14 @@ public class POReceiving implements GTransaction{
             setErrMsg(loInvTrans.getErrMsg());
             return false;
         }
-        
-        //TODO
-            //update branch order info
-    
+
         return saveInvExpiration(fdTransact);
     }
     
     private boolean unsaveInvTrans(String fsTransNox, String fsSupplier){
+        String lsOrderNo = "";
+        String lsSQL = "";
+        
         InventoryTrans loInvTrans = new InventoryTrans(poGRider, poGRider.getBranchCode());
         loInvTrans.InitTransaction();
         
@@ -939,6 +849,20 @@ public class POReceiving implements GTransaction{
             loInvTrans.setDetail(lnCtr, "nResvOrdr", paDetailOthers.get(lnCtr).getValue("nResvOrdr"));
             loInvTrans.setDetail(lnCtr, "nBackOrdr", paDetailOthers.get(lnCtr).getValue("nBackOrdr"));
             loInvTrans.setDetail(lnCtr, "nLedgerNo", paDetailOthers.get(lnCtr).getValue("nLedgerNo"));
+        
+            lsOrderNo = poDetail.get(lnCtr).getOrderNox();
+            
+            if (!lsOrderNo.equals("")) {
+                lsSQL = "UPDATE PO_Detail SET" +
+                            "  nReceived = nReceived - " + poDetail.get(lnCtr).getQuantity() +
+                        " WHERE sTransNox = " + SQLUtil.toSQL(lsOrderNo) +
+                            " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox();
+                
+                if (poGRider.executeQuery(lsSQL, "PO_Detail", psBranchCd, "") <= 0){
+                    setMessage("Unable to update order reference.");
+                    return false;
+                }
+            }  
         }
         
         if (!loInvTrans.POReceiving(fsTransNox, poGRider.getServerDate(), fsSupplier, EditMode.DELETE)){
@@ -946,10 +870,7 @@ public class POReceiving implements GTransaction{
             setErrMsg(loInvTrans.getErrMsg());
             return false;
         }
-        
-        //TODO
-            //update branch order info
-    
+
         return true;
     }
     
@@ -969,10 +890,7 @@ public class POReceiving implements GTransaction{
             setErrMsg(loInvTrans.getErrMsg());
             return false;
         }
-        
-        //TODO
-            //update branch order info
-    
+
         return true;
     }
     

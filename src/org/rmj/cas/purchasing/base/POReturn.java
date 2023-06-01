@@ -15,13 +15,14 @@ import org.rmj.appdriver.MiscUtil;
 import org.rmj.appdriver.SQLUtil;
 import org.rmj.appdriver.constants.EditMode;
 import org.rmj.appdriver.constants.TransactionStatus;
+import org.rmj.appdriver.constants.UserRight;
 import org.rmj.cas.inventory.base.InvExpiration;
 import org.rmj.cas.inventory.base.InvMaster;
 import org.rmj.cas.inventory.base.InventoryTrans;
 import org.rmj.cas.purchasing.pojo.UnitPOReturnDetail;
 import org.rmj.cas.purchasing.pojo.UnitPOReturnMaster;
 
-public class POReturn implements GTransaction{
+public class POReturn implements GTransaction{   
     @Override
     public UnitPOReturnMaster newTransaction() {
         UnitPOReturnMaster loObj = new UnitPOReturnMaster();
@@ -84,41 +85,12 @@ public class POReturn implements GTransaction{
         
         // Typecast the Entity to this object
         loNewEnt = (UnitPOReturnMaster) foEntity;
-        
-        
-        // Test if entry is ok
-        if (loNewEnt.getBranchCd()== null || loNewEnt.getBranchCd().isEmpty()){
-            setMessage("Invalid branch detected.");
-            return loResult;
-        }
-        
+                
         if (loNewEnt.getDateTransact()== null){
             setMessage("Invalid transact date detected.");
             return loResult;
         }
-        
-        if (loNewEnt.getCompanyID()== null || loNewEnt.getCompanyID().isEmpty()){
-            setMessage("Invalid company detected.");
-            return loResult;
-        }
-        
-        
-        /*
-        if (loNewEnt.getSourceNo()== null || loNewEnt.getSourceNo().isEmpty()){
-            setMessage("Invalid source number detected.");
-            return loResult;
-        }
-        
-        if (loNewEnt.getSourceCd()== null || loNewEnt.getSourceCd().isEmpty()){
-            setMessage("Invalid source code detected.");
-            return loResult;
-        }*/
-        
-        if (loNewEnt.getInvTypeCd()== null || loNewEnt.getInvTypeCd().isEmpty()){
-            setMessage("Invalid inventory type detected.");
-            return loResult;
-        }
-               
+
         if (!pbWithParent) poGRider.beginTrans();
         
         // Generate the SQL Statement
@@ -244,6 +216,11 @@ public class POReturn implements GTransaction{
         
         if (!loObject.getTranStat().equalsIgnoreCase(TransactionStatus.STATE_OPEN)){
             setMessage("Unable to close closed/cancelled/posted/voided transaction.");
+            return lbResult;
+        }
+        
+        if (poGRider.getUserLevel() < UserRight.SUPERVISOR){
+            setMessage("User is not allowed confirming transaction.");
             return lbResult;
         }
         
@@ -471,7 +448,7 @@ public class POReturn implements GTransaction{
                 loInvTrans.setDetail(lnCtr, "nQtyOnHnd", loInv.getMaster("nQtyOnHnd"));
                 loInvTrans.setDetail(lnCtr, "nResvOrdr", loInv.getMaster("nResvOrdr"));
                 loInvTrans.setDetail(lnCtr, "nBackOrdr", loInv.getMaster("nBackOrdr"));
-                loInvTrans.setDetail(lnCtr, "nLedgerNo", loInv.getMaster("nLedgerNo"));
+                loInvTrans.setDetail(lnCtr, "nLedgerNo", loInv.getMaster("nLedgerNo")); 
             } else {
                 setErrMsg("No Inventory Found.");
                 setMessage("Unable to search item on inventory.");
@@ -626,6 +603,11 @@ public class POReturn implements GTransaction{
                     poDetail.remove(lnCtr);
                     return true;
                 }
+            }
+            
+            if (Double.parseDouble(poDetail.get(lnCtr).getQuantity().toString()) <= 0.00){
+                setMessage("Unable to save zero quantity detail.");
+                return false;
             }
             
             poDetail.get(lnCtr).setTransNox(fsTransNox);

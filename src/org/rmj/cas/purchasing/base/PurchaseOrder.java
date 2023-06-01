@@ -14,6 +14,7 @@ import org.rmj.appdriver.MiscUtil;
 import org.rmj.appdriver.SQLUtil;
 import org.rmj.appdriver.agentfx.CommonUtils;
 import org.rmj.appdriver.constants.TransactionStatus;
+import org.rmj.appdriver.constants.UserRight;
 import org.rmj.cas.inventory.base.Inventory;
 import org.rmj.cas.purchasing.pojo.UnitPODetail;
 import org.rmj.cas.purchasing.pojo.UnitPOMaster;
@@ -111,22 +112,13 @@ public class PurchaseOrder implements GTransaction{
             setMessage("No supplier detected.");
             return loResult;
         }
+
+        if (poDetail.get(ItemCount()-1).getStockID().equals("")) deleteDetail(ItemCount() -1);
         
-        /*
-        if (loNewEnt.getSourceNo()== null || loNewEnt.getSourceNo().isEmpty()){
-            setMessage("Invalid source number detected.");
+        if (ItemCount() <= 0){
+            setMessage("Unable to save no item record.");
             return loResult;
         }
-        
-        if (loNewEnt.getSourceCd()== null || loNewEnt.getSourceCd().isEmpty()){
-            setMessage("Invalid source code detected.");
-            return loResult;
-        }*/
-        
-//        if (loNewEnt.getInvTypeCd()== null || loNewEnt.getInvTypeCd().isEmpty()){
-//            setMessage("Invalid inventory type detected.");
-//            return loResult;
-//        }
                
         if (!pbWithParent) poGRider.beginTrans();
         
@@ -446,6 +438,11 @@ public class PurchaseOrder implements GTransaction{
             return lbResult;
         }
         
+        if (poGRider.getUserLevel() < UserRight.SUPERVISOR){
+            setMessage("User is not allowed confirming transaction.");
+            return lbResult;
+        }
+        
         String lsSQL = "UPDATE " + loObject.getTable() + 
                         " SET  cTranStat = " + SQLUtil.toSQL(TransactionStatus.STATE_CLOSED) + 
                             ", sApproved = " + SQLUtil.toSQL(fsUserIDxx) +
@@ -586,80 +583,46 @@ public class PurchaseOrder implements GTransaction{
     }
     
     private boolean saveDetail(UnitPOMaster foData, boolean fbNewRecord) throws SQLException{
-        if (ItemCount() <= 0){
-            setMessage("No transaction detail detected.");
-            return false;
-        }
-        
         UnitPODetail loDetail;
         UnitPODetail loOldDet;
         int lnCtr;
         String lsSQL;
         
         for (lnCtr = 0; lnCtr <= ItemCount() -1; lnCtr++){
-            if (lnCtr == 0){
-                if (poDetail.get(lnCtr).getStockID() == null || poDetail.get(lnCtr).getStockID().isEmpty()){
-                    setMessage("Invalid stock id detected.");
-                    return false;
-                }
-            }else {
-                if (poDetail.get(lnCtr).getStockID() == null || poDetail.get(lnCtr).getStockID().isEmpty()){ 
-                    poDetail.remove(lnCtr);
-                    return true;
-                }
-            }
-            if (poDetail.get(lnCtr).getStockID().equals("") &&
-                !paDetailOthers.get(lnCtr).getValue(101).equals("")){
-            
-                //create inventory.
-                Inventory loInv = new Inventory(poGRider, psBranchCd, true);
-                loInv.NewRecord();
-                
-                if (paDetailOthers.get(lnCtr).getValue(100).equals(""))
-                    loInv.setMaster("sBarCodex", CommonUtils.getNextReference(poGRider.getConnection(), "Inventory", "sBarCodex", true));
-                else
-                    loInv.setMaster("sBarCodex", paDetailOthers.get(lnCtr).getValue(100));
-                    
-                loInv.setMaster("sDescript", paDetailOthers.get(lnCtr).getValue(101));
-                loInv.setMaster("sInvTypCd", foData.getInvTypeCd());
-                loInv.setMaster("nUnitPrce", 0.00);
-                loInv.setMaster("nSelPrice", 0.00);
-                if (!loInv.SaveRecord()){
-                    setMessage(loInv.getErrMsg() + "; " + loInv.getMessage());
-                    return false;
-                }
-                
-                poDetail.get(lnCtr).setStockID((String) loInv.getMaster("sStockIDx"));
-            }
-            
-            poDetail.get(lnCtr).setTransNox(foData.getTransNox());
-            poDetail.get(lnCtr).setEntryNox(lnCtr + 1);
-            poDetail.get(lnCtr).setDateModified(poGRider.getServerDate());
-            
             if (!poDetail.get(lnCtr).getStockID().equals("")){
-                if (fbNewRecord){
-                    //Generate the SQL Statement
-                    lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),"nQtyOnHnd");
-                }else{
-                    //Load previous transaction
-                    loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
-
-                    //Generate the Update Statement
-                    lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
-                                                "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
-                                                    " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox(),
-                                                "nQtyOnHnd");
+                if (Double.parseDouble(poDetail.get(lnCtr).getQuantity().toString()) <= 0.00){
+                    setMessage("Unable to save zero quantity detail.");
+                    return false;
                 }
+                
+                poDetail.get(lnCtr).setTransNox(foData.getTransNox());
+                poDetail.get(lnCtr).setEntryNox(lnCtr + 1);
+                poDetail.get(lnCtr).setDateModified(poGRider.getServerDate());
 
-                if (!lsSQL.equals("")){
-//                        lsSQL = MiscUtil.rowset2SQL(p_oMaster, "Incentive_Master", "xBranchNm;xDeptName");
-                    if(poGRider.executeQuery(lsSQL, pxeDetTable, "", "") == 0){
-                        if(!poGRider.getErrMsg().isEmpty()){ 
-                            setErrMsg(poGRider.getErrMsg());
-                            return false;
+                if (!poDetail.get(lnCtr).getStockID().equals("")){
+                    if (fbNewRecord){
+                        //Generate the SQL Statement
+                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),"nQtyOnHnd");
+                    }else{
+                        //Load previous transaction
+                        loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
+
+                        //Generate the Update Statement
+                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
+                                                    "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
+                                                        " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox(),
+                                                    "nQtyOnHnd");
+                    }
+
+                    if (!lsSQL.equals("")){
+                        if(poGRider.executeQuery(lsSQL, pxeDetTable, "", "") == 0){
+                            if(!poGRider.getErrMsg().isEmpty()){ 
+                                setErrMsg(poGRider.getErrMsg());
+                                return false;
+                            }
+                        }else {
+                            setMessage("No record updated");
                         }
-                    }else {
-                        setMessage("No record updated");
                     }
                 }
             }

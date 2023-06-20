@@ -159,7 +159,7 @@ public class PurchaseOrder implements GTransaction{
                 loOldEnt = loadTransaction(fsTransNox);
                 
                 //save detail first
-                if (!saveDetail(loNewEnt, true)) {
+                if (!saveDetail(loNewEnt, false)) {
                     poGRider.rollbackTrans();
                     return loResult;
                 }
@@ -603,7 +603,7 @@ public class PurchaseOrder implements GTransaction{
                     if (fbNewRecord){
                         //Generate the SQL Statement
                         lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),"nQtyOnHnd");
-                    }else{
+                    } else{
                         //Load previous transaction
                         loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
 
@@ -689,6 +689,7 @@ public class PurchaseOrder implements GTransaction{
                 loOcc.setValue(lnCol, loRS.getObject(lnCol));
             }
             loDetail.add(loOcc);
+            paDetailOthers.add(new UnitPOReceivingDetailOthers());
         }
         
         return loDetail;

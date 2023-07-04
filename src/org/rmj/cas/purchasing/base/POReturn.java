@@ -109,8 +109,11 @@ public class POReturn implements GTransaction{
                 loNewEnt.setDatePrepared(poGRider.getServerDate());
                 
                 //save detail first
-                saveDetail(lsTransNox, true);
                 
+                if(!saveDetail(lsTransNox, true)){
+                    return null;
+                }
+//                saveDetail(lsTransNox, true);
                 loNewEnt.setEntryNox(ItemCount());
                 
                 if (!pbWithParent) MiscUtil.close(loConn);
@@ -126,7 +129,11 @@ public class POReturn implements GTransaction{
                 loOldEnt = loadTransaction(fsTransNox);
                 
                 //save detail first
-                saveDetail(fsTransNox, true);
+//                saveDetail(fsTransNox, true);
+
+                if(!saveDetail(fsTransNox, false)){
+                    return null;
+                }
                 
                 loNewEnt.setEntryNox(ItemCount());
                 loNewEnt.setDateModified(poGRider.getServerDate());

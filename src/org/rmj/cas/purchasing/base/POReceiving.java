@@ -157,7 +157,7 @@ public class POReceiving implements GTransaction{
                 loOldEnt = loadTransaction(fsTransNox);
                 
                 //save detail first
-                if(!saveDetail(loNewEnt, true)){
+                if(!saveDetail(loNewEnt, false)){
                     poGRider.rollbackTrans();
                     return null;
                 }

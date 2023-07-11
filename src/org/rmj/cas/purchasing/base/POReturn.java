@@ -623,7 +623,8 @@ public class POReturn implements GTransaction{
             
             if (fbNewRecord){
                 //Generate the SQL Statement
-                lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr));
+                lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),
+                                            "sBrandNme");
             }else{
                 //Load previous transaction
                 loOldDet = loadTransDetail(fsTransNox, lnCtr + 1);
@@ -631,7 +632,8 @@ public class POReturn implements GTransaction{
                 //Generate the Update Statement
                 lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
                                             "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
-                                                " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox());
+                                                " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox(),
+                                            "sBrandNme");
             }
             
             if (!lsSQL.equals("")){
@@ -699,10 +701,20 @@ public class POReturn implements GTransaction{
             loRS.absolute(lnCtr);
             
             loOcc = new UnitPOReturnDetail();
+            loOcc.setValue("sTransNox", loRS.getString("sTransNox"));
+            loOcc.setValue("nEntryNox", loRS.getInt("nEntryNox"));
+            loOcc.setValue("sStockIDx", loRS.getString("sStockIDx"));
+            loOcc.setValue("cUnitType", loRS.getString("cUnitType"));
+            loOcc.setValue("nQuantity", loRS.getDouble("nQuantity"));
+            loOcc.setValue("nUnitPrce", loRS.getDouble("nUnitPrce"));
+            loOcc.setValue("nFreightx", loRS.getDouble("nFreightx"));
+            loOcc.setValue("dExpiryDt", loRS.getDate("dExpiryDt"));
+            loOcc.setValue("dModified", loRS.getDate("dModified"));
+            loOcc.setValue("sBrandNme", loRS.getString("sBrandNme"));
             
-            for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
-                loOcc.setValue(lnCol, loRS.getObject(lnCol));
-            }
+//            for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
+//                loOcc.setValue(lnCol, loRS.getObject(lnCol));
+//            }
 
             loDetail.add(loOcc);
         }
@@ -712,16 +724,21 @@ public class POReturn implements GTransaction{
     
     private String getSQ_Detail(){
         return "SELECT" +
-                    "  sTransNox" +
-                    ", nEntryNox" +
-                    ", sStockIDx" +
-                    ", cUnitType" +
-                    ", nQuantity" +
-                    ", nUnitPrce" +
-                    ", nFreightx" +
-                    ", dExpiryDt" +
-                    ", dModified" +
-                " FROM " + pxeDetTable +
+                    "  a.sTransNox" +
+                    ", a.nEntryNox" +
+                    ", a.sStockIDx" +
+                    ", a.cUnitType" +
+                    ", a.nQuantity" +
+                    ", a.nUnitPrce" +
+                    ", a.nFreightx" +
+                    ", a.dExpiryDt" +
+                    ", a.dModified" +
+                    ", IFNULL(c.sDescript,'') sBrandNme  " +
+                " FROM " + pxeDetTable + " a " + 
+                "   LEFT JOIN Inventory b  " +
+                "       ON a.sStockIDx = b.sStockIDx  " +
+                "   LEFT JOIN Brand c  " +
+                "      ON b.sBrandCde = c.sBrandCde  " +
                 " ORDER BY nEntryNox";
     }
     

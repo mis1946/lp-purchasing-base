@@ -123,7 +123,7 @@ public class PurchaseOrder implements GTransaction{
         if (!pbWithParent) poGRider.beginTrans();
         
         // Generate the SQL Statement
-        if (fsTransNox.equals("")){
+        if (fsTransNox.isEmpty()){
             try {
                 Connection loConn = null;
                 loConn = setConnection();
@@ -602,7 +602,7 @@ public class PurchaseOrder implements GTransaction{
                 if (!poDetail.get(lnCtr).getStockID().equals("")){
                     if (fbNewRecord){
                         //Generate the SQL Statement
-                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),"nQtyOnHnd");
+                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),"nQtyOnHnd;sBrandNme");
                     } else{
                         //Load previous transaction
                         loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
@@ -611,7 +611,7 @@ public class PurchaseOrder implements GTransaction{
                         lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
                                                     "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
                                                         " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox(),
-                                                    "nQtyOnHnd");
+                                                    "nQtyOnHnd;sBrandNme");
                     }
 
                     if (!lsSQL.equals("")){
@@ -647,9 +647,91 @@ public class PurchaseOrder implements GTransaction{
         
         return true;
     }
-    
+//    private boolean saveDetail(String fsTransNox, boolean fbNewRecord) throws SQLException{
+//        if (ItemCount() <= 0){
+//            setMessage("No transaction detail detected.");
+//            return false;
+//        }
+//        
+//        UnitPODetail loDetail;
+//        UnitPODetail loOldDet;
+//        int lnCtr;
+//        String lsSQL;
+//        
+//        for (lnCtr = 0; lnCtr <= ItemCount() -1; lnCtr++){
+//            if (lnCtr == 0){
+//                if (poDetail.get(lnCtr).getStockID() == null || poDetail.get(lnCtr).getStockID().isEmpty()){
+//                    setMessage("Invalid stock id detected.");
+//                    return false;
+//                }
+//            }else {
+//                if (poDetail.get(lnCtr).getStockID() == null || poDetail.get(lnCtr).getStockID().isEmpty()){ 
+//                    poDetail.remove(lnCtr);
+//                    return true;
+//                }
+//            }
+//            
+//            if (Double.parseDouble(poDetail.get(lnCtr).getQuantity().toString()) <= 0.00){
+//                setMessage("Unable to save zero quantity detail.");
+//                return false;
+//            }
+//            
+//            poDetail.get(lnCtr).setTransNox(fsTransNox);
+//            poDetail.get(lnCtr).setEntryNox(lnCtr + 1);
+//            poDetail.get(lnCtr).setDateModified(poGRider.getServerDate());
+//            
+//            if (fbNewRecord){
+//                //Generate the SQL Statement
+//                lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),
+//                                            "nQtyOnHnd;sBrandNme");
+//            }else{
+//                //Load previous transaction
+//                loOldDet = loadTransDetail(fsTransNox, lnCtr + 1);
+//            
+//                //Generate the Update Statement
+//                lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
+//                                            "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
+//                                                " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox(),
+//                                            "nQtyOnHnd;sBrandNme");
+//            }
+//            
+//            if (!lsSQL.equals("")){
+//                if(poGRider.executeQuery(lsSQL, pxeDetTable, "", "") == 0){
+//                    if(!poGRider.getErrMsg().isEmpty()){ 
+//                        setErrMsg(poGRider.getErrMsg());
+//                        return false;
+//                    }
+//                }else {
+//                    setMessage("No record updated");
+//                }
+//            }
+//        }    
+//        
+//        //check if the new detail is less than the original detail count
+//        int lnRow = loadTransDetail(fsTransNox).size();
+//        if (lnCtr < lnRow -1){
+//            for (lnCtr = lnCtr + 1; lnCtr <= lnRow; lnCtr++){
+//                lsSQL = "DELETE FROM " + pxeDetTable +  
+//                        " WHERE sTransNox = " + SQLUtil.toSQL(fsTransNox) + 
+//                            " AND nEntryNox = " + lnCtr;
+//                
+//                if(poGRider.executeQuery(lsSQL, pxeDetTable, "", "") == 0){
+//                    if(!poGRider.getErrMsg().isEmpty()) setErrMsg(poGRider.getErrMsg());
+//                }else {
+//                    setMessage("No record updated");
+//                    return false;
+//                }
+//            }
+//        }
+//        
+//        return true;
+//    }
+//    
     private UnitPODetail loadTransDetail(String fsTransNox, int fnEntryNox) throws SQLException{
         UnitPODetail loObj = null;
+        
+        System.out.println("getSQ_Detail = " + MiscUtil.addCondition(getSQ_Detail(), 
+                                                    "sTransNox = " + SQLUtil.toSQL(fsTransNox)));
         ResultSet loRS = poGRider.executeQuery(
                             MiscUtil.addCondition(getSQ_Detail(), 
                                                     "sTransNox = " + SQLUtil.toSQL(fsTransNox)) + 
@@ -675,7 +757,8 @@ public class PurchaseOrder implements GTransaction{
         
         ArrayList<UnitPODetail> loDetail = new ArrayList<>();
         paDetailOthers = new ArrayList<>(); //reset detail others
-        
+        System.out.println("getSQ_Detail = " + MiscUtil.addCondition(getSQ_Detail(), 
+                                                    "sTransNox = " + SQLUtil.toSQL(fsTransNox)));
         ResultSet loRS = poGRider.executeQuery(
                             MiscUtil.addCondition(getSQ_Detail(), 
                                                     "sTransNox = " + SQLUtil.toSQL(fsTransNox)));
@@ -684,7 +767,16 @@ public class PurchaseOrder implements GTransaction{
             loRS.absolute(lnCtr);
             
             loOcc = new UnitPODetail();
-            
+//            loOcc.setValue("sTransNox", loRS.getString("sTransNox"));
+//            loOcc.setValue("nEntryNox", loRS.getInt("nEntryNox"));
+//            loOcc.setValue("sStockIDx", loRS.getString("sStockIDx"));
+//            loOcc.setValue("nQuantity", loRS.getDouble("nQuantity"));
+//            loOcc.setValue("nUnitPrce", loRS.getDouble("nUnitPrce"));
+//            loOcc.setValue("nReceived", loRS.getDouble("nReceived"));
+//            loOcc.setValue("nCancelld", loRS.getDouble("nCancelld"));
+//            loOcc.setValue("dModified", loRS.getDate("dModified"));
+//            loOcc.setValue("nQtyOnHnd", loRS.getDouble("nQtyOnHnd"));
+//            loOcc.setValue("sBrandNme", loRS.getString("sBrandNme"));
             for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
                 loOcc.setValue(lnCol, loRS.getObject(lnCol));
             }
@@ -697,15 +789,24 @@ public class PurchaseOrder implements GTransaction{
     
     private String getSQ_Detail(){
         return "SELECT" +
-                    "  sTransNox" +
-                    ", nEntryNox" + 
-                    ", sStockIDx" + 
-                    ", nQuantity" + 
-                    ", nUnitPrce" + 
-                    ", nReceived" + 
-                    ", nCancelld" + 
-                    ", dModified" + 
-                " FROM " + pxeDetTable +
+                    "  a.sTransNox" +
+                    ", a.nEntryNox" + 
+                    ", a.sStockIDx" + 
+                    ", a.nQuantity" + 
+                    ", a.nUnitPrce" + 
+                    ", a.nReceived" + 
+                    ", a.nCancelld" + 
+                    ", a.dModified" + 
+                    ", IFNULL(b.nQtyOnHnd, 0) nQtyOnHnd" + 
+                    ", IFNULL(d.sDescript,'') sBrandNme  " +
+                " FROM " + pxeDetTable + " a " + 
+                "   LEFT JOIN Inv_Master b  " +
+                "       ON a.sStockIDx = b.sStockIDx  " +
+                            " AND b.sBranchCD = " + SQLUtil.toSQL(psBranchCd) +
+                "   LEFT JOIN Inventory c  " +
+                "       ON b.sStockIDx = c.sStockIDx  " +
+                "   LEFT JOIN Brand d  " +
+                "      ON c.sBrandCde = d.sBrandCde  " +
                 " ORDER BY nEntryNox";
     }
     

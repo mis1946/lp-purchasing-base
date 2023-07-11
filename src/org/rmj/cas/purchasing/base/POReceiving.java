@@ -642,7 +642,8 @@ public class POReceiving implements GTransaction{
                 if (!poDetail.get(lnCtr).getStockID().equals("")){
                     if (fbNewRecord){
                         //Generate the SQL Statement
-                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr));
+                        lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr),
+                                                    "sBrandNme");
                     }else{
                         //Load previous transaction
                         loOldDet = loadTransDetail(foData.getTransNox(), lnCtr + 1);
@@ -650,7 +651,8 @@ public class POReceiving implements GTransaction{
                         //Generate the Update Statement
                         lsSQL = MiscUtil.makeSQL((GEntity) poDetail.get(lnCtr), (GEntity) loOldDet, 
                                                     "sTransNox = " + SQLUtil.toSQL(poDetail.get(lnCtr).getTransNox()) + 
-                                                        " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox());
+                                                        " AND nEntryNox = " + poDetail.get(lnCtr).getEntryNox(),
+                                                    "sBrandNme");
                     }
 
                     if (!lsSQL.equals("")){
@@ -706,7 +708,11 @@ public class POReceiving implements GTransaction{
             //load each column to the entity
             loObj = new UnitPOReceivingDetail();
             for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
-                loObj.setValue(lnCol, loRS.getObject(lnCol));
+                if(lnCol<=11){
+                    loObj.setValue(lnCol, loRS.getObject(lnCol));
+                }else if(lnCol == 19){
+                        loObj.setValue(12, loRS.getObject(lnCol));
+                }
             }
         }      
         return loObj;
@@ -720,6 +726,8 @@ public class POReceiving implements GTransaction{
         
         ArrayList<UnitPOReceivingDetail> loDetail = new ArrayList<>();
         paDetailOthers = new ArrayList<>(); //reset detail other
+        System.out.println("getSQ_Detail() = " + MiscUtil.addCondition(getSQ_Detail(), 
+                                                    "sTransNox = " + SQLUtil.toSQL(fsTransNox)));
         
         ResultSet loRS = poGRider.executeQuery(
                             MiscUtil.addCondition(getSQ_Detail(), 
@@ -727,31 +735,52 @@ public class POReceiving implements GTransaction{
         
         for (int lnCtr = 1; lnCtr <= MiscUtil.RecordCount(loRS); lnCtr ++){
             loRS.absolute(lnCtr);
+            int lnCol1 = 1;
             
             loOcc = new UnitPOReceivingDetail();
-            loOcc.setValue("sTransNox", loRS.getString("sTransNox"));        
-            loOcc.setValue("nEntryNox", loRS.getInt("nEntryNox"));
-            loOcc.setValue("sOrderNox", loRS.getString("sOrderNox"));
-            loOcc.setValue("sStockIDx", loRS.getString("sStockIDx"));
-            loOcc.setValue("sReplacID", loRS.getString("sReplacID"));
-            loOcc.setValue("cUnitType", loRS.getString("cUnitType"));
-            loOcc.setValue("nQuantity", loRS.getDouble("nQuantity"));
-            loOcc.setValue("nUnitPrce", loRS.getDouble("nUnitPrce"));
-            loOcc.setValue("nFreightx", loRS.getDouble("nFreightx"));
-            loOcc.setValue("dExpiryDt", loRS.getDate("dExpiryDt"));
-            loOcc.setValue("dModified", loRS.getDate("dModified"));
-            loDetail.add(loOcc);
             
-            //load other info
             loOth = new UnitPOReceivingDetailOthers();
-            loOth.setValue("sStockIDx", loRS.getString("sStockIDx"));
-            loOth.setValue("nQtyOnHnd", loRS.getDouble("nQtyOnHnd"));
-            loOth.setValue("xQtyOnHnd", loRS.getDouble("xQtyOnHnd"));
-            loOth.setValue("nResvOrdr", loRS.getDouble("nResvOrdr"));
-            loOth.setValue("nBackOrdr", loRS.getDouble("nBackOrdr"));
-            loOth.setValue("nReorderx", 0);
-            loOth.setValue("nLedgerNo", loRS.getInt("nLedgerNo"));
-            loOth.setValue("sMeasurNm", loRS.getString("sMeasurNm"));
+            for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
+//                loOcc.setValue(lnCol, loRS.getObject(lnCol));
+                System.out.println("lnCol = " + lnCol + " : " + loRS.getObject(lnCol));
+                if(lnCol<=11){
+                    if(lnCol == 4){
+                        loOth.setValue(1, loRS.getObject(lnCol));
+                    }
+                    loOcc.setValue(lnCol, loRS.getObject(lnCol));
+                }else if(lnCol >=12 && lnCol<19){
+                        loOth.setValue(lnCol1, loRS.getObject(lnCol));
+                }else if(lnCol == 19){
+                        loOcc.setValue(12, loRS.getObject(lnCol));
+                }
+                lnCol1++;
+
+            }
+            
+//            loOcc.setValue("sTransNox", loRS.getObject("sTransNox"));        
+//            loOcc.setValue("nEntryNox", loRS.getObject("nEntryNox"));
+//            loOcc.setValue("sOrderNox", loRS.getObject("sOrderNox"));
+//            loOcc.setValue("sStockIDx", loRS.getObject("sStockIDx"));
+//            loOcc.setValue("sReplacID", loRS.getObject("sReplacID"));
+//            loOcc.setValue("cUnitType", loRS.getObject("cUnitType"));
+//            loOcc.setValue("nQuantity", loRS.getObject("nQuantity"));
+//            loOcc.setValue("nUnitPrce", loRS.getObject("nUnitPrce"));
+//            loOcc.setValue("nFreightx", loRS.getObject("nFreightx"));
+//            loOcc.setValue("dExpiryDt", loRS.getObject("dExpiryDt"));
+//            loOcc.setValue("dModified", loRS.getObject("dModified"));
+//            loOcc.setValue("sBrandNme", loRS.getObject("sBrandNme"));
+            
+            loDetail.add(loOcc);
+            //load other info
+//            loOth = new UnitPOReceivingDetailOthers();
+//            loOth.setValue("sStockIDx", loRS.getObject("sStockIDx"));
+//            loOth.setValue("nQtyOnHnd", loRS.getObject("nQtyOnHnd"));
+//            loOth.setValue("xQtyOnHnd", loRS.getObject("xQtyOnHnd"));
+//            loOth.setValue("nResvOrdr", loRS.getObject("nResvOrdr"));
+//            loOth.setValue("nBackOrdr", loRS.getObject("nBackOrdr"));
+//            loOth.setValue("nReorderx", 0);
+//            loOth.setValue("nLedgerNo", loRS.getInt("nLedgerNo"));
+//            loOth.setValue("sMeasurNm", loRS.getObject("sMeasurNm"));
             paDetailOthers.add(loOth);
         }
         
@@ -778,6 +807,7 @@ public class POReceiving implements GTransaction{
                     ", IFNULL(b.nFloatQty, 0) nFloatQty" +
                     ", IFNULL(b.nLedgerNo, 0) nLedgerNo" +
                     ", IFNULL(e.sMeasurNm, '') sMeasurNm" +
+                    ", IFNULL(f.sDescript, '') sBrandNme" +
                 " FROM " + pxeDetTable + " a" +
                     " LEFT JOIN Inventory d" + 
                         " ON a.sReplacID = d.sStockIDx" + 
@@ -785,9 +815,11 @@ public class POReceiving implements GTransaction{
                         " ON a.sStockIDx = b.sStockIDx" + 
                             " AND b.sBranchCD = " + SQLUtil.toSQL(psBranchCd) +
                     " LEFT JOIN Inventory c" + 
-                        " LEFT JOIN Measure e" +
-                            " ON c.sMeasurID = e.sMeasurID" +
                         " ON b.sStockIDx = c.sStockIDx" +  
+                    " LEFT JOIN Brand f" + 
+                        " ON c.sBrandCde = f.sBrandCde" +  
+                    " LEFT JOIN Measure e" +
+                        " ON c.sMeasurID = e.sMeasurID" +
                 " ORDER BY a.nEntryNox";
     }
     

@@ -21,6 +21,7 @@ import org.rmj.appdriver.constants.TransactionStatus;
 import org.rmj.appdriver.constants.UserRight;
 import org.rmj.cas.inventory.base.InventoryTrans;
 import org.rmj.cas.inventory.base.InvExpiration;
+import org.rmj.cas.inventory.base.Inventory;
 import org.rmj.cas.purchasing.pojo.UnitPOReceivingDetail;
 import org.rmj.cas.purchasing.pojo.UnitPOReceivingDetailOthers;
 import org.rmj.cas.purchasing.pojo.UnitPOReceivingMaster;
@@ -49,6 +50,7 @@ public class POReceiving implements GTransaction{
         loConn = setConnection();   
         
         String lsSQL = MiscUtil.addCondition(getSQ_Master(), "sTransNox = " + SQLUtil.toSQL(fsTransNox));
+        System.out.println("POREceiving" + lsSQL);
         ResultSet loRS = poGRider.executeQuery(lsSQL);
         
         try {
@@ -62,6 +64,7 @@ public class POReceiving implements GTransaction{
                 
                 //load detail
                 poDetail = loadTransDetail(fsTransNox);
+                
             }              
         } catch (SQLException ex) {
             setErrMsg(ex.getMessage());
@@ -181,8 +184,7 @@ public class POReceiving implements GTransaction{
         if(poGRider.executeQuery(lsSQL, loNewEnt.getTable(), "", "") == 0){
             if(!poGRider.getErrMsg().isEmpty())
                 setErrMsg(poGRider.getErrMsg());
-            else
-            setMessage("No record updated");
+            else setMessage("No record updated");
         } else loResult = loNewEnt;
         
         if (!pbWithParent) {
@@ -598,6 +600,7 @@ public class POReceiving implements GTransaction{
     public Object getDetail(int fnRow, int fnCol){
         switch(fnCol){
             case 100:
+                return paDetailOthers.get(fnRow).getValue("xBarCodex");
             case 101:
             case 102:
                 return paDetailOthers.get(fnRow).getValue("sMeasurNm");
@@ -638,7 +641,7 @@ public class POReceiving implements GTransaction{
                 poDetail.get(lnCtr).setTransNox(foData.getTransNox());
                 poDetail.get(lnCtr).setEntryNox(lnCtr + 1);
                 poDetail.get(lnCtr).setDateModified(poGRider.getServerDate());
-
+                
                 if (!poDetail.get(lnCtr).getStockID().equals("")){
                     if (fbNewRecord){
                         //Generate the SQL Statement
@@ -694,7 +697,34 @@ public class POReceiving implements GTransaction{
         
         return true;
     }
-    
+                         
+    private double computeUnitPrice(UnitPOReceivingDetail loDetail) {
+        try{
+            UnitPOReceivingDetail loOldDet = loadInvDetail(loDetail.getStockID());
+            double lnQty = Double.parseDouble(loDetail.getQuantity().toString());
+            double lnQty1 = Double.parseDouble(loOldDet.getQuantity().toString());
+            double lnValue = Double.parseDouble(loDetail.getUnitPrice().toString());
+            double lnValue1 =  Double.parseDouble(loOldDet.getUnitPrice().toString());
+            System.out.println("new qty = " + lnQty);
+            System.out.println("old qty= " + lnQty1);
+            System.out.println("new price = " + lnValue);
+            System.out.println("old price= " + lnValue1);
+            System.out.println("new = " + (lnValue * lnQty));
+            System.out.println("old = " + (lnValue1 * lnQty1));
+            if(Double.parseDouble(loOldDet.getUnitPrice().toString())> 0){
+                if(!loDetail.getUnitPrice().equals(loOldDet.getUnitPrice())){
+                    double avgCost = ((lnValue * lnQty) + (lnValue1 * lnQty1)) / (lnQty + lnQty1);
+//                    poDetail.get(lnRow).setUnitPrice(avgCost);
+                    
+                    return avgCost;
+                }
+            }
+        }catch(SQLException e){
+            
+        }
+        
+        return 0.00;
+    }
     private UnitPOReceivingDetail loadTransDetail(String fsTransNox, int fnEntryNox) throws SQLException{
         UnitPOReceivingDetail loObj = null;
         ResultSet loRS = poGRider.executeQuery(
@@ -709,7 +739,38 @@ public class POReceiving implements GTransaction{
             loObj = new UnitPOReceivingDetail();
             for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
                 if(lnCol<=11){
+                    
                     loObj.setValue(lnCol, loRS.getObject(lnCol));
+                    
+                }else if(lnCol == 19){
+                        loObj.setValue(12, loRS.getObject(lnCol));
+                }
+            }
+        }      
+        return loObj;
+    }
+    
+    private UnitPOReceivingDetail loadInvDetail(String fsTransNox) throws SQLException{
+         UnitPOReceivingDetail loObj = null;
+         System.out.println(MiscUtil.addCondition(getSQ_Stock(), 
+                                                    "a.sStockIDx = " + SQLUtil.toSQL(fsTransNox)));
+        ResultSet loRS = poGRider.executeQuery(
+                            MiscUtil.addCondition(getSQ_Stock(), 
+                                                    "a.sStockIDx = " + SQLUtil.toSQL(fsTransNox)));
+        
+        if (!loRS.next()){
+            setMessage("No Record Found");
+        }else{
+            //load each column to the entity
+            loObj = new UnitPOReceivingDetail();
+            for(int lnCol=1; lnCol<=loRS.getMetaData().getColumnCount(); lnCol++){
+                if(lnCol<=9){
+                    if(lnCol == 2){
+                        loObj.setValue(lnCol, 1);
+                    }else loObj.setValue(lnCol, loRS.getObject(lnCol));
+                    
+                }else if(lnCol >= 10 && lnCol <=11){
+                        loObj.setValue(lnCol, poGRider.getServerDate());
                 }else if(lnCol == 19){
                         loObj.setValue(12, loRS.getObject(lnCol));
                 }
@@ -748,14 +809,17 @@ public class POReceiving implements GTransaction{
                         loOth.setValue(1, loRS.getObject(lnCol));
                     }
                     loOcc.setValue(lnCol, loRS.getObject(lnCol));
+                    if(lnCol == 8){
+                       
+                    }
                 }else if(lnCol >=12 && lnCol<19){
                         loOth.setValue(lnCol1, loRS.getObject(lnCol));
                 }else if(lnCol == 19){
                         loOcc.setValue(12, loRS.getObject(lnCol));
                 }
                 lnCol1++;
-
             }
+            
             
 //            loOcc.setValue("sTransNox", loRS.getObject("sTransNox"));        
 //            loOcc.setValue("nEntryNox", loRS.getObject("nEntryNox"));
@@ -822,8 +886,110 @@ public class POReceiving implements GTransaction{
                         " ON c.sMeasurID = e.sMeasurID" +
                 " ORDER BY a.nEntryNox";
     }
+     private String getSQ_Stock(){
+        return "SELECT" +
+                    "  '' sTransNox" +
+                    ", 0 nEntryNox" +
+                    ", '' sOrderNox" +
+                    ", a.sStockIDx" +
+                    ", '' sReplacID" +
+                    ", '' cUnitType" +
+                    ", IFNULL(b.nQtyOnHnd, 0)  nQuantity" +
+                    ", a.nUnitPrce" +
+                    ", 0 nFreightx" +
+                    ", '' dExpiryDt" +
+                    ", '' dModified" +
+                    ", IFNULL(b.nQtyOnHnd, 0) nQtyOnHnd" + 
+                    ", IFNULL(b.nQtyOnHnd, 0) xQtyOnHnd" + 
+                    ", IFNULL(b.nResvOrdr, 0) nResvOrdr" +
+                    ", IFNULL(b.nBackOrdr, 0) nBackOrdr" +
+                    ", IFNULL(b.nFloatQty, 0) nFloatQty" +
+                    ", IFNULL(b.nLedgerNo, 0) nLedgerNo" +
+                    ", IFNULL(d.sMeasurNm, '') sMeasurNm" +
+                    ", IFNULL(c.sDescript, '') sBrandNme" +
+                " FROM  Inventory a" + 
+                    " LEFT JOIN Inv_Master b" +
+                        " ON a.sStockIDx = b.sStockIDx" + 
+                            " AND b.sBranchCD = " + SQLUtil.toSQL(psBranchCd) +
+                    " LEFT JOIN Brand c" + 
+                        " ON a.sBrandCde = c.sBrandCde" +  
+                    " LEFT JOIN Measure d" +
+                        " ON a.sMeasurID = d.sMeasurID" +
+                " ORDER BY a.sStockIDx";
+    }
     
     //Added methods
+    private boolean saveInvUnitPrice(){
+        String lsBarCode = "";
+        String lsStockID = "";
+        String lsSQL = "";
+        Inventory loInventory;
+        InventoryTrans loInvTrans = new InventoryTrans(poGRider, poGRider.getBranchCode());
+        loInvTrans.InitTransaction();
+        
+        
+        for (int lnCtr = 0; lnCtr <= poDetail.size() - 1; lnCtr ++){
+            if (poDetail.get(lnCtr).getStockID().equals("")) break;
+            
+            
+            lsStockID = poDetail.get(lnCtr).getStockID();
+//            lsBarCode = paDetailOthers.get(lnCtr).getValue("xBarCodex").toString();
+//            lsBarCode = getDetail(lnCtr, 100).toString();
+            
+            if (!lsStockID.equals("")) {
+                loInventory =  GetInventory(lsStockID, true, false);
+                lsBarCode = loInventory.getMaster("sBarCodex").toString();
+                lsSQL = "UPDATE Inventory SET" +
+                            "  nUnitPrce = " + poDetail.get(lnCtr).getUnitPrice()+
+                        " WHERE sStockIDx = " + SQLUtil.toSQL(lsStockID) +
+                            " AND sBarCodex = " + SQLUtil.toSQL(lsBarCode) ;
+                
+                if (poGRider.executeQuery(lsSQL, "Inventory", psBranchCd, "") <= 0){
+                    setMessage("Unable to update inventory unit price.");
+                    return false;
+                }
+            }  
+        }
+        
+
+        return saveInvAvgCost();
+    }
+    
+    public Inventory GetInventory(String fsValue, boolean fbByCode, boolean fbSearch){        
+        Inventory instance = new Inventory(poGRider, psBranchCd, fbSearch);
+        instance.BrowseRecord(fsValue, fbByCode, false);
+        return instance;
+    }
+    //Added methods
+    private boolean saveInvAvgCost(){
+        String lsStockID = "";
+        String lsSQL = "";
+        
+        InventoryTrans loInvTrans = new InventoryTrans(poGRider, poGRider.getBranchCode());
+        loInvTrans.InitTransaction();
+        
+        
+        for (int lnCtr = 0; lnCtr <= poDetail.size() - 1; lnCtr ++){
+            if (poDetail.get(lnCtr).getStockID().equals("")) break;
+            
+            lsStockID = poDetail.get(lnCtr).getStockID();
+            if (!lsStockID.equals("")) {
+                lsSQL = "UPDATE Inv_Master SET" +
+                            "  nAvgCostx = + " + computeUnitPrice(poDetail.get(lnCtr)) +
+                        " WHERE sStockIDx = " + SQLUtil.toSQL(lsStockID)+
+                            " AND nBranchCd = " + SQLUtil.toSQL(psBranchCd) ;
+                
+                if (poGRider.executeQuery(lsSQL, "Inv_Master", psBranchCd, "") <= 0){
+                    setMessage("Unable to update inventory average cost.");
+                    return false;
+                }
+            }  
+        }
+        
+
+        return true;
+    }
+    
     private boolean saveInvTrans(String fsTransNox, String fsSupplier, Date fdTransact){
         String lsOrderNo = "";
         String lsSQL = "";
@@ -923,7 +1089,7 @@ public class POReceiving implements GTransaction{
             return false;
         }
 
-        return true;
+        return saveInvUnitPrice();
     }
     
     public void setGRider(GRider foGRider){

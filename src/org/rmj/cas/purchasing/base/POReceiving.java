@@ -977,7 +977,7 @@ public class POReceiving implements GTransaction{
                 lsSQL = "UPDATE Inv_Master SET" +
                             "  nAvgCostx = + " + computeUnitPrice(poDetail.get(lnCtr)) +
                         " WHERE sStockIDx = " + SQLUtil.toSQL(lsStockID)+
-                            " AND nBranchCd = " + SQLUtil.toSQL(psBranchCd) ;
+                            " AND sBranchCd = " + SQLUtil.toSQL(psBranchCd) ;
                 
                 if (poGRider.executeQuery(lsSQL, "Inv_Master", psBranchCd, "") <= 0){
                     setMessage("Unable to update inventory average cost.");
